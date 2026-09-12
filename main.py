@@ -6,7 +6,7 @@ app = FastAPI()
 
 #We see a list of managers.
 @app.get("/")
-def get_users():
+def Get_managers():
     connection = connect()
     cursor = connection.cursor()
 
@@ -30,9 +30,9 @@ class User(BaseModel):
     name: str
     password: str
 
-#We add a manager.
+#Manager sign up
 @app.post("/users")
-def add_users(user: User):
+def Register_manager(user: User):
     connection = connect()
     cursor = connection.cursor()
     cursor.execute(
@@ -47,3 +47,30 @@ def add_users(user: User):
     connection.close()
 
     return {"message": "User added successfully"}
+
+#Manager sign in
+@app.post("/login")
+def Login_manager(user: User):
+    connection = connect()
+    cursor = connection.cursor()
+    cursor.execute(
+        """
+        select id, name, status from users
+        where name = %s and password = %s
+        """,
+        (user.name, user.password)
+    )
+
+    manager = cursor.fetchone()
+    cursor.close()
+    connection.close()
+
+    if manager is None:
+        return {"message": "User not found"}
+
+    return {
+        "message": "Logged in successfully",
+        "id": manager[0],
+        "name": manager[1],
+        "status": manager[2]
+    }
