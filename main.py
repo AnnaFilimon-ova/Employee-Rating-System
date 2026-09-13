@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from database import connect
 from pydantic import BaseModel, Field
 import bcrypt
@@ -11,20 +11,21 @@ def get_managers():
     connection = connect()
     cursor = connection.cursor()
 
-    cursor.execute("SELECT id, name, status FROM users")
-    users = cursor.fetchall()
+    try:
+        cursor.execute("SELECT id, name, status FROM users")
+        users = cursor.fetchall()
 
-    cursor.close()
-    connection.close()
-
-    return [
-        {
-            "id": user[0],
-            "name": user[1],
-            "status": user[3]
-        }
-        for user in users
-    ]
+        return [
+            {
+                "id": user[0],
+                "name": user[1],
+                "status": user[2]
+            }
+            for user in users
+        ]
+    finally:
+        cursor.close()
+        connection.close()
 
 class User(BaseModel):
     name: str = Field(min_length=1, max_length=50)
@@ -41,12 +42,14 @@ def register_manager(user: User):
             user.password.encode("utf-8"),
             bcrypt.gensalt()
         ).decode("utf-8")
+
         cursor.execute(
             """
             INSERT INTO users (name, password)
             VALUES (%s, %s)
+            returning id, name, status
             """,
-            (user.name, user.password)
+            (user.name, hashed_password)
         )
 
         manager = cursor.fetchone()
@@ -75,16 +78,19 @@ def login_manager(user: User):
     try:
         cursor.execute(
             """
-            select id, name, status from users
-            where name = %s and password = %s
+            select id, name, password, status from users
+            where name = %s 
             """,
-            (user.name, user.password)
+            (user.name,)
         )
 
         manager = cursor.fetchone()
 
         if manager is None:
-            return {"message": "User not found"}
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid username or password"
+            )
 
         password_correct = bcrypt.checkpw(
             user.password.encode("utf-8"),
@@ -92,13 +98,16 @@ def login_manager(user: User):
         )
 
         if not password_correct:
-            return {"message": "Wrong password"}
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid username or password"
+            )
 
         return {
             "message": "Logged in successfully",
             "id": manager[0],
             "name": manager[1],
-            "status": manager[2]
+            "status": manager[3]
         }
 
     finally:
