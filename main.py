@@ -27,13 +27,17 @@ def get_managers():
         cursor.close()
         connection.close()
 
-class User(BaseModel):
+class RegisterRequest(BaseModel):
     name: str = Field(min_length=1, max_length=50)
     password: str = Field(min_length=9, max_length=50)
 
+class LoginRequest(BaseModel):
+    name: str
+    password: str
+
 #Manager sign up
 @app.post("/users")
-def register_manager(user: User):
+def register_manager(user: RegisterRequest):
     connection = connect()
     cursor = connection.cursor()
 
@@ -71,7 +75,7 @@ def register_manager(user: User):
 
 #Manager sign in
 @app.post("/login")
-def login_manager(user: User):
+def login_manager(user: LoginRequest):
     connection = connect()
     cursor = connection.cursor()
 
